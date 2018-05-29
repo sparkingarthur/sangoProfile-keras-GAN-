@@ -12,7 +12,7 @@ from keras.layers import Input,Dense,Dropout,Conv2D,Conv2DTranspose,Reshape,Batc
 from keras.layers.merge import concatenate,add,subtract,multiply
 from keras.layers import MaxPooling2D,AveragePooling2D
 from keras.layers.advanced_activations import LeakyReLU,PReLU
-from keras.optimizers import Adam
+from keras.optimizers import Adam,RMSprop
 from keras.models import Model
 
 
@@ -50,8 +50,8 @@ def get_discriminator_netmowrk(inputs_shape=(64,64,3),kernel_init = 'glorot_unif
     discriminator = Dense(1)(discriminator)
     discriminator = Activation('sigmoid')(discriminator)
 
-    dis_opt = Adam(lr=0.0002)
-    discriminator_model = Model(input=dis_input, output=discriminator)
+    dis_opt = RMSprop(lr=0.0001)
+    discriminator_model = Model(inputs=dis_input, outputs=discriminator)
     discriminator_model.compile(loss='binary_crossentropy', optimizer=dis_opt, metrics=['accuracy'])
     discriminator_model.summary()
     return discriminator_model
@@ -97,8 +97,8 @@ def get_generator_network(fakeinputs_shape=(1,1,2048),kernel_init = 'glorot_unif
     generator = Conv2DTranspose(filters=3, kernel_size=(1, 1), padding="same",
                                 kernel_initializer=kernel_init)(generator)
 
-    gen_opt = Adam(lr=0.00015)
-    generator_model = Model(input=gen_input, output=generator)
+    gen_opt = RMSprop(lr=0.0001)
+    generator_model = Model(inputs=gen_input, outputs=generator)
     generator_model.compile(loss='binary_crossentropy', optimizer=gen_opt, metrics=['accuracy'])
     generator_model.summary()
 
