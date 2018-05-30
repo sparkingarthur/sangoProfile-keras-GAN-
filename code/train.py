@@ -32,7 +32,7 @@ logPath = '../log'
 modelsavePath = '../savedmodel/'
 
 imageShape = (64,64,3)
-fakeShpe = (1,1,2048)
+fakeShpe = (1,1,100)
 TOTAL_SAMPLES = 1198
 NUM_STEPS=20000
 BATCH_SIZE = 64
@@ -43,14 +43,14 @@ WRITE_LOG = True
  :return a number between [0,1]
 '''
 def norm_pic(pic):
-    img = pic /255.
+    img = (pic / 127.5) - 1
     return img
 
 '''
   :return a number between [0,255]
 '''
 def denorm_pic(pic):
-    img = pic*255
+    img = (pic + 1) * 127.5
     return img.astype(np.uint8)
 
 def sample_real_X(fileLists,image_shape=(64,64,3),batch_size=32):
@@ -63,19 +63,21 @@ def sample_real_X(fileLists,image_shape=(64,64,3),batch_size=32):
         file_path = os.path.join(samplePath,file)
         # print(file_name)
         img = cv2.imread(file_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = norm_pic(img)
-        sample[i]=img
+        sample[i,...]=img
     #print(sample.shape)
     return sample
 
-def gen_fake_seed(batch_size=32,noise_shape=(1,1,2048)):
-    seeds = np.random.random(size=(batch_size,) + noise_shape)
+def gen_fake_seed(batch_size=32,noise_shape=(1,1,100)):
+    # seeds = np.random.random_sample(size=(batch_size,) + noise_shape)
+    seeds = np.random.normal(0,1,size=(batch_size,) + noise_shape)
     #print(seeds)
     return seeds
 
-def generate_fake_imgs(generator, save_dir,save_file_name):
-    random_seed = gen_fake_seed(batch_size=32)
-    fake_data_X = generator.predict(random_seed)
+def generate_fake_imgs(generator, save_dir, save_file_name):
+    random_seeds = gen_fake_seed(batch_size=64)
+    fake_data_X = generator.predict(random_seeds)
     print("Displaying generated images")
     plt.figure(figsize=(4, 4))
     gs1 = gridspec.GridSpec(4, 4)
@@ -120,9 +122,9 @@ if __name__ == '__main__':
     files = os.listdir(samplePath)
 
     generator = get_generator_network(fakeinputs_shape=fakeShpe)
-    discriminator = get_discriminator_netmowrk(inputs_shape=imageShape)
+    discriminator = get_discriminator_netmowrk()
     discriminator.trainable = False
-    opt = RMSprop(lr=0.0001)  # same as gen
+    opt = Adam(lr=0.00015, beta_1=0.5)  # same as gen
     gen_inp = Input(shape=fakeShpe)
     GAN_inp = generator(gen_inp)
     GAN_opt = discriminator(GAN_inp)
@@ -143,7 +145,7 @@ if __name__ == '__main__':
         noise_seeds = gen_fake_seed(batch_size=BATCH_SIZE,noise_shape=fakeShpe)
         fake_data_X = generator.predict(noise_seeds)
         real_data_X = sample_real_X(fileLists=files, image_shape=imageShape, batch_size=BATCH_SIZE)
-        if((step+1) % 100 == 0):
+        if((step) % 10 == 0):
             save_imgs(fake_data_X,image_save_dir+'step'+str(step)+'.png') ## save the results of generator every 20 steps
 
         # real_data_Y = np.ones(BATCH_SIZE)
@@ -151,22 +153,31 @@ if __name__ == '__main__':
         # fake_data_Y = np.zeros(BATCH_SIZE)
         fake_data_Y = np.random.random_sample(BATCH_SIZE)*0.2
 
-        dis_data_X = np.concatenate([real_data_X, fake_data_X])
-        dis_data_Y = np.concatenate([real_data_Y,fake_data_Y])
-
-        ### shuffle the training data for training
-        dis_data_X,dis_data_Y = sklearn_shuffle(dis_data_X,dis_data_Y)
+        # dis_data_X = np.concatenate([real_data_X, fake_data_X])
+        # dis_data_Y = np.concatenate([real_data_Y, fake_data_Y])
+        #
+        # ### shuffle the training data for training
+        # dis_data_X,dis_data_Y = sklearn_shuffle(dis_data_X,dis_data_Y)
         ### ==============training begins==================
         ### step1:fix the generator, train the discriminator
         discriminator.trainable = True
         generator.trainable = False
-        dis_metrics = discriminator.train_on_batch(dis_data_X,dis_data_Y)
+        # dis_metrics = discriminator.train_on_batch(dis_data_X,dis_data_Y)
+        dis_real = discriminator.train_on_batch(real_data_X,real_data_Y)
+        dis_fake = discriminator.train_on_batch(fake_data_X,fake_data_Y)
+        dis_metrics=[]
+        dis_metrics.append((dis_real[0] + dis_fake[0]) / 2)
+        dis_metrics.append ((dis_real[1] + dis_fake[1]) / 2)
+
         print("step %d: discriminator loss %.6f, acc %.6f"%(step,dis_metrics[0],dis_metrics[1]))
         avg_disc_fake_loss.append(dis_metrics[0])
         ### step2: fix the discriminator ,train the generator
-        gan_data_X = gen_fake_seed(batch_size=BATCH_SIZE,noise_shape=fakeShpe)
-        gan_data_Y = real_data_Y
+
         generator.trainable = True
+
+        gan_data_X = gen_fake_seed(batch_size=BATCH_SIZE, noise_shape=fakeShpe)
+        gan_data_Y = real_data_Y
+
         discriminator.trainable = False
         gan_metrics = gan_model.train_on_batch(gan_data_X, gan_data_Y)
         print("step %d: gan loss %.6f, acc %.6f" % (step, gan_metrics[0], gan_metrics[1]))
