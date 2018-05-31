@@ -35,7 +35,7 @@ imageShape = (64,64,3)
 fakeShpe = (1,1,100)
 TOTAL_SAMPLES = 1198
 NUM_STEPS=20000
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 
 WRITE_LOG = True
 
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     generator = get_generator_network(fakeinputs_shape=fakeShpe)
     discriminator = get_discriminator_netmowrk()
     discriminator.trainable = False
-    opt = Adam(lr=0.00015, beta_1=0.5)  # same as gen
+    opt = Adam(lr=0.0002, beta_1=0.5)  # same as gen
     gen_inp = Input(shape=fakeShpe)
     GAN_inp = generator(gen_inp)
     GAN_opt = discriminator(GAN_inp)
@@ -145,7 +145,7 @@ if __name__ == '__main__':
         noise_seeds = gen_fake_seed(batch_size=BATCH_SIZE,noise_shape=fakeShpe)
         fake_data_X = generator.predict(noise_seeds)
         real_data_X = sample_real_X(fileLists=files, image_shape=imageShape, batch_size=BATCH_SIZE)
-        if((step) % 10 == 0):
+        if((step) % 50 == 0):
             save_imgs(fake_data_X,image_save_dir+'step'+str(step)+'.png') ## save the results of generator every 20 steps
 
         # real_data_Y = np.ones(BATCH_SIZE)
@@ -169,7 +169,7 @@ if __name__ == '__main__':
         dis_metrics.append((dis_real[0] + dis_fake[0]) / 2)
         dis_metrics.append ((dis_real[1] + dis_fake[1]) / 2)
 
-        print("step %d: discriminator loss %.6f, acc %.6f"%(step,dis_metrics[0],dis_metrics[1]))
+        print("step %d: discriminator loss %.6f"%(step,dis_metrics[0]))
         avg_disc_fake_loss.append(dis_metrics[0])
         ### step2: fix the discriminator ,train the generator
 
@@ -180,11 +180,11 @@ if __name__ == '__main__':
 
         discriminator.trainable = False
         gan_metrics = gan_model.train_on_batch(gan_data_X, gan_data_Y)
-        print("step %d: gan loss %.6f, acc %.6f" % (step, gan_metrics[0], gan_metrics[1]))
+        print("step %d: gan loss %.6f" % (step, gan_metrics[0]))
         avg_GAN_loss.append(gan_metrics[0])
         if WRITE_LOG:
-            text_file.write("step %d: dis loss %.6f, dis acc %.6f, gan loss %.6f, gan acc %.6f\r\n"
-                            % (step, dis_metrics[0], dis_metrics[1],gan_metrics[0], gan_metrics[1]))
+            text_file.write("step %d: dis loss %.6f, gan loss %.6f\r\n"
+                            % (step, dis_metrics[0],gan_metrics[0]))
 
         if ((step + 1) % 500) == 0:
             print("-----------------------------------------------------------------")
